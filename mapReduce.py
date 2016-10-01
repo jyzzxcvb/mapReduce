@@ -179,13 +179,19 @@ class MatrixMultMR(MyMapReduce): #[TODO]
     n_col = 0
     m_col = 0
     #overload constructor to take matrix dimensions as input
-    def __init__(self, data, row, col, m_col, num_map_tasks=4, num_reduce_tasks=3): #[DONE]
-        self.m_row = row
-        self.n_col = col
-        self.m_col = m_col
+    def __init__(self, data, num_map_tasks=4, num_reduce_tasks=3): #[DONE]
+
         self.data = data  #the "file": list of all key value pairs
         self.num_map_tasks=num_map_tasks #how many processes to spawn as map tasks
         self.num_reduce_tasks=num_reduce_tasks # " " " as reduce tasks
+        #in order not to change constructor format
+        for cell in data:
+            if cell[0][0] == 'm':
+                self.m_row = max(self.m_row, cell[0][1]+1)
+                self.m_col = max(self.m_col, cell[0][2]+1)
+            else:
+                self.n_col = max(self.n_col, cell[0][2]+1)
+
     #the mapper and reducer for matrix multiplication
     def map(self, k, v): #[DONE]
         pairs = []
@@ -233,6 +239,7 @@ def findPrime(n):
 
 def genCoeff(n, range):
     return np.random.randint(1,range, n)
+
 def minhash(documents, k=5): #[TODO]
     #returns a minhashed signature for each document
     #documents is a list of strings
@@ -261,69 +268,36 @@ def minhash(documents, k=5): #[TODO]
     n = 100 # number of hash functions
     coeffA = genCoeff(n, keyCount)
     coeffB = genCoeff(n, keyCount)
-    largePrime = findPrime(keyCount*10)
-    signatures = []
+    largePrime = findPrime(keyCount*10) # found to work best
 
-    signatureD = np.full((n, len(shingles)), largePrime)
+    signatures = np.full((n, len(shingles)), largePrime)
     ns = 0
     for shingle in shingles:
-
         signature = []
         for s in shingle:
             for i in range(0,n):
                 hashed = (coeffA[i] * s + coeffB[i]) % largePrime
-                signatureD[i][ns] = min(signatureD[i][ns], hashed)
+                signatures[i][ns] = min(signatures[i][ns], hashed)
 
-
-        for i in range(0, n):
-            minSeen = largePrime
-            for s in shingle:
-                hashed = (coeffA[i] * s + coeffB[i]) % largePrime
-                minSeen = min(minSeen, hashed)
-            signature.append(minSeen)
-        signatures.append(signature)
         ns += 1
     #Print signature matrix and return them
     #[DONE]
     pprint(signatures)
-    pprint(signatureD)
-    """
-    #debugging
-    for i in range(0, 2):
-        # Get the MinHash signature for document i.
-        signature1 = signatures[i]
 
-        # For each of the other test documents...
-        for j in range(i + 1, 3):
-
-            # Get the MinHash signature for document j.
-            signature2 = signatures[j]
-
-            count = 0
-            co = 0
-            # Count the number of positions in the minhash signature which are equal.
-            for k in range(0, n):
-                if signature1[k] == signature2[k]:
-                    count = count+1
-                co = co + (signature1[k] or signature2[k])
-            # Record the percentage of positions which matched.
-            print  "%d and %d : %d %d %f"  % (i , j ,  count , keyCount, count / float(keyCount))
-    #end debugging
-    """
-    #debugging
-    for i in range(0, 2):
-
-        # For each of the other test documents...
-        for j in range(i + 1, 3):
-
-            count = 0
-            # Count the number of positions in the minhash signature which are equal.
-            for k in range(0, n):
-                if signatureD[k][i] == signatureD[k][j]:
-                    count = count+1
-            # Record the percentage of positions which matched.
-            print  "%d and %d : %d %d %f"  % (i , j ,  count , keyCount, count / float(keyCount))
-    #end debugging
+    # #estimate similarity
+    # for i in range(0, 2):
+    #
+    #     # For each of the other test documents...
+    #     for j in range(i + 1, 3):
+    #
+    #         count = 0
+    #         # Count the number of positions in the minhash signature which are equal.
+    #         for k in range(0, n):
+    #             if signatures[k][i] == signatures[k][j]:
+    #                 count = count+1
+    #         # Record the percentage of positions which matched.
+    #         print  "%d and %d : %d %d %f"  % (i , j ,  count , keyCount, count / float(keyCount))
+    # #end estimate
     return signatures #a minhash signature for each document
 
 
@@ -335,34 +309,34 @@ from scipy.sparse import coo_matrix
 
 def matrixToCoordTuples(label, m): #given a dense matrix, returns ((row, col), value), ...
     cm = coo_matrix(np.array(m))
-    return  list(zip(list(zip([label]*len(cm.row), cm.row, cm.col)), cm.data))
+    return zip(zip([label]*len(cm.row), cm.row, cm.col), cm.data)
 
 if __name__ == "__main__": #[DONE: Uncomment peices to test]
     ###################
     ##run WordCount:
-    # data = [(1, "The horse raced past the barn fell"),
-    #         (2, "The complex houses married and single soldiers and their families"),
-    #         (3, "There is nothing either good or bad, but thinking makes it so"),
-    #         (4, "I burn, I pine, I perish"),
-    #         (5, "Come what come may, time and the hour runs through the roughest day"),
-    #         (6, "Be a yardstick of quality."),
-    #         (7, "A horse is the projection of peoples' dreams about themselves - strong, powerful, beautiful"),
-    #         (8, "I believe that at the end of the century the use of words and general educated opinion will have altered so much that one will be able to speak of machines thinking without expecting to be contradicted.")]
-    # mrObject = WordCountMR(data, 4, 3)
-    # mrObject.runSystem()
+    data = [(1, "The horse raced past the barn fell"),
+            (2, "The complex houses married and single soldiers and their families"),
+            (3, "There is nothing either good or bad, but thinking makes it so"),
+            (4, "I burn, I pine, I perish"),
+            (5, "Come what come may, time and the hour runs through the roughest day"),
+            (6, "Be a yardstick of quality."),
+            (7, "A horse is the projection of peoples' dreams about themselves - strong, powerful, beautiful"),
+            (8, "I believe that at the end of the century the use of words and general educated opinion will have altered so much that one will be able to speak of machines thinking without expecting to be contradicted.")]
+    mrObject = WordCountMR(data, 4, 3)
+    mrObject.runSystem()
 
     ####################
     ##run MatrixMultiply
     #(uncomment when ready to test)
-    # data1 = matrixToCoordTuples('m', [[1, 2], [3, 4]]) + matrixToCoordTuples('n', [[1, 2], [3, 4]])
-    # data2 = matrixToCoordTuples('m', [[1, 2, 3], [4, 5, 6]]) + matrixToCoordTuples('n', [[1, 2], [3, 4], [5, 6]])
-    # data3 = matrixToCoordTuples('m', np.random.rand(20,5)) + matrixToCoordTuples('n', np.random.rand(5, 40))
-    # mrObject = MatrixMultMR(data1, 2, 2,2, 2, 2)
-    # mrObject.runSystem()
-    # mrObject = MatrixMultMR(data2, 2, 2, 3, 2, 2)
-    # mrObject.runSystem()
-    # # mrObject = MatrixMultMR(data3, 20, 40,5, 6, 6)
-    # # mrObject.runSystem()
+    data1 = matrixToCoordTuples('m', [[1, 2], [3, 4]]) + matrixToCoordTuples('n', [[1, 2], [3, 4]])
+    data2 = matrixToCoordTuples('m', [[1, 2, 3], [4, 5, 6]]) + matrixToCoordTuples('n', [[1, 2], [3, 4], [5, 6]])
+    data3 = matrixToCoordTuples('m', np.random.rand(20,5)) + matrixToCoordTuples('n', np.random.rand(5, 40))
+    mrObject = MatrixMultMR(data1, 2, 2)
+    mrObject.runSystem()
+    mrObject = MatrixMultMR(data2, 2, 2)
+    mrObject.runSystem()
+    mrObject = MatrixMultMR(data3, 6, 6)
+    mrObject.runSystem()
 
     ######################
     ## run minhashing:
